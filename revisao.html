@@ -1,0 +1,438 @@
+<html><head>
+        <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+        <script id="MathJax-script" async="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+        <script src="https://cdn.jsdelivr.net/gh/google/code-prettify@master/loader/run_prettify.js"></script>
+    </head>
+    
+    <body onload="animar()">
+        <header>
+            <h1> Revisando gráficos, escalas e método das diferenças finitas </h1>
+        </header>
+        
+        <main>
+            <p>
+                A ideia deste texto é apresentar elementos para que seja possível a edição do código 
+                javascript e observar as mudanças neste documento, os resultados podem ser vistos nos 
+                quadros (<code>canvas</code>) que estão ao final do texto.
+            </p>
+            <h2>Eixos coordenados</h2>
+            <p>
+                Para criar os eixos adicionamos o elemento <code>canvas</code> ao <code>html</code> e identificamos ele 
+                no <code>javascript</code> e selecionamos o contexto para <i>2D</i>.
+            </p>
+            <pre class="prettyprint">            <code>
+const can = document.getElementById("canvas1");
+const ctx = canvas.getContext("2d");
+            </code>
+            </pre>
+            
+            <p>
+                Agora precisamos de duas retas para representar os eixos, para iniciar qualquer desenho dentro do canvas 
+                iniciamos pelo comando dentro do objeto de contexto (<code>ctx</code>), <code>ctx.beginPath()</code>, 
+                definir o estilo da linha e usar as funções <code>moveTo(x0,y0)</code> e <code>lineTo(x1,y1)</code> para 
+                desenhar o segmento de reta entre os pontos \(\left(x_0,y_0\right)\) e \(\left(x_1,y_1\right)\).
+            </p>
+            <p>
+                Uma forma de tornar as coisas mais automatizadas é obter as dimensõesdo <code>canvas</code> usando as 
+                funções que armazenam essas informações e fornecendo elas para variáveis, assim podemos escolher os 
+                pontos \(\left(x_0,y_0\right)\) e \(\left(x_1,y_1\right)\) sem estar se preocupando com os valores das 
+                dimensões do quadro:
+            </p>
+            <pre class="prettyprint">            <code>
+const can = document.getElementById("canvas1");
+const ctx = canvas.getContext("2d");
+
+const xp_max = ctx.canvas.width // largura em pixel
+const yp_max = ctx.canvas.height // altura em pixel
+
+// Posição em pixel onde os zeros de cada eixo irão se cruzar, divide por dois para o meio do quadro
+const x0p = xp_max/2;
+const y0p = yp_max/2;
+
+ctx.beginPath();
+ctx.strokeStyle = "black";
+ctx.moveTo(0,y0p); ctx.lineTo(xp_max,y0p); // eixo x
+ctx.moveTo(x0p,0); ctx.lineTo(x0p,yp_max); // eixo y
+/*
+comando para escrever as linhas no quadro,
+sempre que terminar de escrever os elementos
+que queira desenharr use-o para exibir
+*/
+ctx.stroke();
+            </code>
+            </pre>
+            <p>
+                É possível posicionar o eixo y por exemplo num ponto que fique a 10% da dimensão do quadro 
+                basta trocar o fator \(1/2\) por \(10/100\) na definição da variável <code>x0p</code>:
+            </p>
+            <pre class="prettyprint">            <code>
+const x0p = 10/100*xp_xp_max; // tente outros valores inclusive com o eixo x
+            </code>
+            </pre>
+            <p>
+                Para 20% basta usar o fator \(20/100\), e assim por diante.
+            </p>
+            
+            <h2>Escalas nos eixos</h2>
+            <p>
+                Para escrevermos as escalas precisamos subdividir a reta em intervalos igualmente espaçados,
+                vamos analisar o código abaixo:
+            </p>
+            <pre class="prettyprint">            <code>
+const can = document.getElementById("canvas2");
+const ctx = can.getContext("2d");
+
+const xp_max = ctx.canvas.width // largura em pixel
+const yp_max = ctx.canvas.height // altura em pixel
+
+// Posição em pixel onde os zeros de cada eixo irão se cruzar, divide por dois para o meio do quadro
+const x0p = 2*xp_max/10;
+const y0p = yp_max/2;
+
+// Inicia o desenho
+ctx.beginPath();
+ctx.strokeStyle = "black";
+    
+// Eixos
+ctx.moveTo(0,y0p); ctx.lineTo(xp_max,y0p); // eixo x
+ctx.moveTo(x0p,0); ctx.lineTo(x0p,yp_max); // eixo y
+    
+// Escalas
+const dim = 4 // dimensão das marcas nos eixos
+    
+// Marcas no eixo x
+const Nx = 11; // Número de marcas no eixo x
+let Dxp = xp_max/(Nx-1); // Espaçamento em pixel para colocar as marcas
+for(let i=0;i&lt;Nx;i++) {
+xp = i*Dxp;
+ctx.moveTo(xp,y0p-dim); ctx.lineTo(xp,y0p+dim);
+}
+ctx.stroke()
+            </code>
+            </pre>
+            <p>
+                Observe que usamos o eixo y na posição igual a 20% da largura do quadro, para definirmos a 
+                escala em x precisamos definir os valores negativos e positivos de forma que 20% seja usado 
+                para os valores negativos e os outros 80% sejam usados nos valores positivos. Por exemplo se
+                quisermos definir no eixo x uma escala dentro do intervalo \(\left[-5,5\right]\), para o 
+                zero do eixo x posicionado afastado apenas 20% da borda do <code>canvas</code>, podemos 
+                usar o intervalo \(\left[0,5\right]\) como sendo os 80%, os outros 20% pode ser calculado 
+                usando a regra de três
+                \[ 80 \rightarrow 5-0 \]
+                \[ 20 \rightarrow 0-x_{min}, \]
+                com \(x\) o valor do início do intervalo nos números negativos. Pela regra de 
+                três temos 
+                \[ x_{min} =  -5\frac{20}{80}=-\frac{5}{4}.\]
+            </p>
+            <p>
+                Dessa forma o intervalo para uma escala que respeita 20% dos valores do eixo x sendo os 
+                valores negativos e 80% dos valores sendo os positivos, temos o intervalo total dado por 
+                \(\left[-\frac{5}{4},5\right]\).
+            </p>
+            <p>
+                Podemos então definir as variáveis de interesse para os números da escala que iremos escrever 
+                ao lado das marcas:
+            </p>
+            <pre class="prettyprint">            <code>
+let xmin = -5/4; // início do intervalo;
+let xmax = 5; // fim do intervalor;
+let Deltax = xmax-xmin; // tamanho do intervalo na escala do eixo
+let delta = Deltax/xp_max; // razão escala do eixo pela escala em pixel
+            </code>
+            </pre>
+            <p>
+                Na seção anterior, aprendemos como posicionar as marcas no eixo x, temos então que calcular 
+                o valor da escala desejada a partir do valor em pixel usando a variável <code>delta</code>, 
+                que representaremos como \(\delta_x\) nesta equação, seja \(x_p\) o valor em pixel da 
+                localização da marca, o valor na escala do eixo será 
+                \[ x = \left(x_p-x_{0,\text{pixel}}\right)\cdot\delta_x. \]
+            </p>
+            <p>
+                Perceba que na equação acima o \(\delta_x\) possui dimensão da unidade da escala em \(x\) 
+                por pixel, como a subtração dentro dos aprênteses tem dimensão de pixel a unidade resultante 
+                deste produto é a unidade da escala em \(x\), consequentemente esse é o valor de \(x\) que 
+                está naquela posição em pixel. Caso posuíssemos o valor em \(x\) e necessitássemos encontrar 
+                a localização em pixel, bastaria inverter essa relação:
+                \[ x_p = x_{0,\text{pixel}} + \frac{x}{\delta_x}. \]
+            </p>
+            <p>
+                O código completo no eixo x é portanto:
+            </p>
+            <pre class="prettyprint">            <code>
+const can = document.getElementById("canvas2");
+const ctx = can.getContext("2d");
+
+const xp_max = ctx.canvas.width // largura em pixel
+const yp_max = ctx.canvas.height // altura em pixel
+
+// Posição em pixel onde os zeros de cada eixo irão se cruzar, divide por dois para o meio do quadro
+const x0p = 2*xp_max/10;
+const y0p = yp_max/2;
+
+// Inicia o desenho
+ctx.beginPath();
+ctx.strokeStyle = "black";
+    
+// Eixos
+ctx.moveTo(0,y0p); ctx.lineTo(xp_max,y0p); // eixo x
+ctx.moveTo(x0p,0); ctx.lineTo(x0p,yp_max); // eixo y
+    
+// Escalas
+const dim = 4 // dimensão das marcas nos eixos
+    
+// Marcas no eixo x
+const Nx = 11; // Número de marcas no eixo x
+let Dxp = xp_max/(Nx-1); // Espaçamento em pixel para colocar as marcas
+    
+// Início do intervalo
+let xmin = -5/4;
+// Fim do intervalo
+let xmax = 5;
+// Tamanho do intervalo
+let Deltax = xmax-xmin;
+let deltax = Deltax/xp_max;
+    
+for(let i=0;i&lt;Nx;i++) {
+    let xp = i*Dxp; // posição x em pixel
+    let x = (xp-x0p)*deltax; // posição x na escala do eixo
+    ctx.moveTo(xp,y0p-dim); ctx.lineTo(xp,y0p+dim); // desenha a linha
+    ctx.fillText(x.toFixed(3),xp+4,y0p+9);
+}
+ctx.stroke()
+            </code>
+            </pre>
+            <p>
+                Vamos revisar o código acima adicionando os elementos para o eixo y, neste caso vamos 
+                permanecer com o zero posicionado no meio e um isntervalo simétrico \(\left[-10,10\right]\)
+            </p>
+            <pre class="prettyprint">            <code>
+const can = document.getElementById("canvas3");
+const ctx = can.getContext("2d");
+
+const xp_max = ctx.canvas.width // largura em pixel
+const yp_max = ctx.canvas.height // altura em pixel
+
+// Posição em pixel onde os zeros de cada eixo irão se cruzar, divide por dois para o meio do quadro
+const x0p = 2*xp_max/10;
+const y0p = yp_max/2;
+
+// Inicia o desenho
+ctx.beginPath();
+ctx.strokeStyle = "black";
+    
+// Eixos
+ctx.moveTo(0,y0p); ctx.lineTo(xp_max,y0p); // eixo x
+ctx.moveTo(x0p,0); ctx.lineTo(x0p,yp_max); // eixo y
+    
+// Escalas
+const dim = 4 // dimensão das marcas nos eixos
+    
+// Marcas nos eixo x e y
+const Nx = 11; // Número de marcas no eixo x
+let Dxp = xp_max/(Nx-1); // Espaçamento em pixel para colocar as marcas
+const Ny = 11; // Número de marcas no eixo y
+let Dyp = yp_max/(Ny-1); // Espaçamento em pixel para colocar as marcas em y
+    
+// Início do intervalo
+let xmin = -5/4;
+let ymin = -10;
+// Fim do intervalo
+let xmax = 5;
+let ymax = 10;
+// Tamanho do intervalo
+let Deltax = xmax-xmin;
+let deltax = Deltax/xp_max;
+let Deltay = ymax-ymin;
+let deltay = Deltay/yp_max;
+    
+for(let i=0;i&lt;Nx;i++) {
+    let xp = i*Dxp; // posição x em pixel
+    let x = (xp-x0p)*deltax; // posição x na escala do eixo
+    ctx.moveTo(xp,y0p-dim); ctx.lineTo(xp,y0p+dim); // desenha a linha
+    ctx.fillText(x.toFixed(3),xp+4,y0p+9);
+}
+    
+for(let i=0;i&lt;Ny;i++) {
+    let yp = i*Dyp; // posição y em pixel
+    let y = (y0p-yp)*deltay; // posição y na escala do eixo
+    ctx.moveTo(x0p-dim,yp); ctx.lineTo(x0p+dim,yp); // desenha a linha
+    ctx.fillText(y.toFixed(1),x0p-20,yp-4);
+}
+
+ctx.stroke()
+            </code>
+            </pre>
+            <p>
+                Perceba que a equação para o eixo \(y\) tem uma diferença pois o primeiro pixel no eixo 
+                vertical começa de cima e vai crescendo pra baixo, as equaçõe de convenção são portanto 
+                para a posição na escala, sabendo a posição em pixel e veice-versa:
+                \[ y = \left(y_{0,\text{pixel}}-y_p\right)\cdot\delta_y, \]
+                \[ y_p = y_{0,\text{pixel}} - \frac{y}{\delta_y}. \]
+                
+            </p>
+            <p>
+                Experimente mudar os valores constantes somados às variáveis de posição das funções 
+                <code>toFixed</code> tanto em \(x\) quanto em \(y\), e veja os números mudando de posição 
+                em torno das marcas, tente deixar num posicinamento mais apresentável.
+            </p>
+            <h1>
+                Diferenças finitas
+            </h1>
+            <p>
+                Nosso objetivo com esse método é calcular as variáveis de uma dinâmica a partir da adição de pequenas 
+                diferenças calculadas conforme as equações do movimento do sistema estudado. No movimento bidimensional 
+                uma possibilidade de efetuarmos isso é calculando as sequintes equações, para cada corpo em movimento:
+                \[ x_{i+1} = x_i +\Delta x; \]
+                \[ v_{x,i+1} = v_{x,i} +\Delta v_x; \]
+                \[ y_{i+1} = y_i +\Delta y; \]
+                \[ v_{y,i+1} = v_{y,i} +\Delta v_y. \]
+            </p>
+            <p>
+                Essa coleção de \(\Delta\)'s geralmente são funções de todas as coordenadas envolvidas no sistema, isto 
+                é, dependem das posições e velocidades envolvidas no problema. Ao analisarmos um problema que envolva a 
+                interação entre dois corpos isso fica mais explícito, vamos escrever as equações de interação 
+                gravitacional entre dois corpos de massa \(m_1\) e \(m_2\) respectivamente, 
+                podemos escrever as equações do movimento dos dois corpos, por simplicidade vamos imaginar apenas o 
+                movimento bidimensional no plano em que os corpos desenvolvem seu movimento um em torno do outro, veja 
+                imagem
+            </p>
+            <center>
+            <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="620" height="544"><defs><clipPath id="reMTyvgWCITG"><path fill="none" stroke="none" d=" M 0 0 L 620 0 L 620 544 L 0 544 L 0 0 Z"></path></clipPath></defs><g transform="scale(1,1)" clip-path="url(#reMTyvgWCITG)"><g><rect fill="rgb(255,255,255)" stroke="none" x="0" y="0" width="620" height="544" fill-opacity="1"></rect><path fill="none" stroke="rgb(0,0,0)" paint-order="fill stroke markers" d=" M 71.5 2.5 L 71.5 544.5" stroke-opacity="1" stroke-miterlimit="10"></path><path fill="none" stroke="rgb(0,0,0)" paint-order="fill stroke markers" d=" M 71.5 1.5 L 67.5 5.5" stroke-opacity="1" stroke-miterlimit="10"></path><path fill="none" stroke="rgb(0,0,0)" paint-order="fill stroke markers" d=" M 71.5 1.5 L 75.5 5.5" stroke-opacity="1" stroke-miterlimit="10"></path><text fill="rgb(0,0,0)" stroke="none" font-family="geogebra-sans-serif, sans-serif" font-size="16px" font-style="normal" font-weight="normal" text-decoration="normal" x="602" y="507" text-anchor="start" dominant-baseline="alphabetic" fill-opacity="1">x</text><path fill="none" stroke="rgb(0,0,0)" paint-order="fill stroke markers" d=" M 0.5 511.5 L 618.5 511.5" stroke-opacity="1" stroke-miterlimit="10"></path><path fill="none" stroke="rgb(0,0,0)" paint-order="fill stroke markers" d=" M 619.5 511.5 L 615.5 507.5" stroke-opacity="1" stroke-miterlimit="10"></path><path fill="none" stroke="rgb(0,0,0)" paint-order="fill stroke markers" d=" M 619.5 511.5 L 615.5 515.5" stroke-opacity="1" stroke-miterlimit="10"></path><path fill="none" stroke="rgb(0,0,0)" paint-order="fill stroke markers" d=" M 0.5 511.5 L 0.5 514.5" stroke-opacity="1" stroke-miterlimit="10"></path><path fill="none" stroke="rgb(0,0,0)" paint-order="fill stroke markers" d=" M 71.5 511.5 L 71.5 514.5" stroke-opacity="1" stroke-miterlimit="10"></path><path fill="none" stroke="rgb(0,0,0)" paint-order="fill stroke markers" d=" M 142.5 511.5 L 142.5 514.5" stroke-opacity="1" stroke-miterlimit="10"></path><path fill="none" stroke="rgb(0,0,0)" paint-order="fill stroke markers" d=" M 214.5 511.5 L 214.5 514.5" stroke-opacity="1" stroke-miterlimit="10"></path><path fill="none" stroke="rgb(0,0,0)" paint-order="fill stroke markers" d=" M 285.5 511.5 L 285.5 514.5" stroke-opacity="1" stroke-miterlimit="10"></path><path fill="none" stroke="rgb(0,0,0)" paint-order="fill stroke markers" d=" M 356.5 511.5 L 356.5 514.5" stroke-opacity="1" stroke-miterlimit="10"></path><path fill="none" stroke="rgb(0,0,0)" paint-order="fill stroke markers" d=" M 427.5 511.5 L 427.5 514.5" stroke-opacity="1" stroke-miterlimit="10"></path><path fill="none" stroke="rgb(0,0,0)" paint-order="fill stroke markers" d=" M 498.5 511.5 L 498.5 514.5" stroke-opacity="1" stroke-miterlimit="10"></path><path fill="none" stroke="rgb(0,0,0)" paint-order="fill stroke markers" d=" M 569.5 511.5 L 569.5 514.5" stroke-opacity="1" stroke-miterlimit="10"></path><text fill="rgb(0,0,0)" stroke="none" font-family="geogebra-sans-serif, sans-serif" font-size="16px" font-style="normal" font-weight="normal" text-decoration="normal" x="76" y="17" text-anchor="start" dominant-baseline="alphabetic" fill-opacity="1">y</text><path fill="none" stroke="rgb(0,0,0)" paint-order="fill stroke markers" d=" M 68.5 440.5 L 71.5 440.5" stroke-opacity="1" stroke-miterlimit="10"></path><path fill="none" stroke="rgb(0,0,0)" paint-order="fill stroke markers" d=" M 68.5 369.5 L 71.5 369.5" stroke-opacity="1" stroke-miterlimit="10"></path><path fill="none" stroke="rgb(0,0,0)" paint-order="fill stroke markers" d=" M 68.5 298.5 L 71.5 298.5" stroke-opacity="1" stroke-miterlimit="10"></path><path fill="none" stroke="rgb(0,0,0)" paint-order="fill stroke markers" d=" M 68.5 227.5 L 71.5 227.5" stroke-opacity="1" stroke-miterlimit="10"></path><path fill="none" stroke="rgb(0,0,0)" paint-order="fill stroke markers" d=" M 68.5 156.5 L 71.5 156.5" stroke-opacity="1" stroke-miterlimit="10"></path><path fill="none" stroke="rgb(0,0,0)" paint-order="fill stroke markers" d=" M 68.5 85.5 L 71.5 85.5" stroke-opacity="1" stroke-miterlimit="10"></path><path fill="none" stroke="rgb(0,0,0)" paint-order="fill stroke markers" d=" M 68.5 14.5 L 71.5 14.5" stroke-opacity="1" stroke-miterlimit="10"></path><path fill="none" stroke="rgb(0,0,255)" paint-order="fill stroke markers" d=" M 218.9531555576256 72.6221898315867 L 218.95315555762562 511.91946756073787" stroke-opacity="0.6980392156862745" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="2.5" stroke-dasharray="6.5,4"></path><path fill="none" stroke="rgb(255,0,0)" paint-order="fill stroke markers" d=" M 553.6230671998042 264.4137930419122 L 553.6230671998042 511.91946756073787" stroke-opacity="0.6980392156862745" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="2.5" stroke-dasharray="6.5,4"></path><path fill="none" stroke="rgb(0,0,255)" paint-order="fill stroke markers" d=" M 218.9531555576256 72.6221898315867 L 71.76923824130938 72.6221898315867" stroke-opacity="0.6980392156862745" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="2.5" stroke-dasharray="6.5,4"></path><path fill="none" stroke="rgb(255,0,0)" paint-order="fill stroke markers" d=" M 553.6230671998042 264.4137930419122 L 71.76923824130938 264.41379304191224" stroke-opacity="0.6980392156862745" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="2.5" stroke-dasharray="6.5,4"></path><path fill="none" stroke="rgb(0,0,255)" paint-order="fill stroke markers" d=" M 71.76923824130938 511.91946756073787 L 213.55247258164394 88.74151436436232" stroke-opacity="0.6980392156862745" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="2.5"></path><path fill="rgb(0,0,255)" stroke="none" paint-order="stroke fill markers" fill-rule="evenodd" d=" M 218.9531555576256 72.6221898315867 L 217.58230371483785 90.09168510835774 L 209.52264144845003 87.3913436203669 Z" fill-opacity="0.6980392156862745"></path><text fill="rgb(0,0,255)" stroke="none" font-family="geogebra-sans-serif, sans-serif" font-size="16px" font-style="normal" font-weight="normal" text-decoration="normal" x="161" y="213" text-anchor="start" dominant-baseline="alphabetic" fill-opacity="1">r</text><text fill="none" stroke="rgb(255,255,255)" font-family="geogebra-sans-serif, sans-serif" font-size="16px" font-style="normal" font-weight="normal" text-decoration="normal" x="161" y="213" text-anchor="start" dominant-baseline="alphabetic" stroke-opacity="1" stroke-linejoin="bevel" stroke-miterlimit="10" stroke-width="3">r</text><text fill="rgb(0,0,255)" stroke="none" font-family="geogebra-sans-serif, sans-serif" font-size="16px" font-style="normal" font-weight="normal" text-decoration="normal" x="161" y="213" text-anchor="start" dominant-baseline="alphabetic" fill-opacity="1">r</text><text fill="rgb(0,0,255)" stroke="none" font-family="geogebra-sans-serif, sans-serif" font-size="14px" font-style="normal" font-weight="normal" text-decoration="normal" x="166" y="220" text-anchor="start" dominant-baseline="alphabetic" fill-opacity="1">1</text><text fill="none" stroke="rgb(255,255,255)" font-family="geogebra-sans-serif, sans-serif" font-size="14px" font-style="normal" font-weight="normal" text-decoration="normal" x="166" y="220" text-anchor="start" dominant-baseline="alphabetic" stroke-opacity="1" stroke-linejoin="bevel" stroke-miterlimit="10" stroke-width="3">1</text><text fill="rgb(0,0,255)" stroke="none" font-family="geogebra-sans-serif, sans-serif" font-size="14px" font-style="normal" font-weight="normal" text-decoration="normal" x="166" y="220" text-anchor="start" dominant-baseline="alphabetic" fill-opacity="1">1</text><path fill="none" stroke="rgb(255,0,0)" paint-order="fill stroke markers" d=" M 71.76923824130938 511.91946756073787 L 538.5012852326963 272.1811420194753" stroke-opacity="0.6980392156862745" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="2.5"></path><path fill="rgb(255,0,0)" stroke="none" paint-order="stroke fill markers" fill-rule="evenodd" d=" M 553.6230671998042 264.4137930419122 L 540.4431224770871 275.9615875112523 L 536.5594479883056 268.40069652769836 Z" fill-opacity="0.6980392156862745"></path><text fill="rgb(255,0,0)" stroke="none" font-family="geogebra-sans-serif, sans-serif" font-size="16px" font-style="normal" font-weight="normal" text-decoration="normal" x="380" y="346" text-anchor="start" dominant-baseline="alphabetic" fill-opacity="1">r</text><text fill="none" stroke="rgb(255,255,255)" font-family="geogebra-sans-serif, sans-serif" font-size="16px" font-style="normal" font-weight="normal" text-decoration="normal" x="380" y="346" text-anchor="start" dominant-baseline="alphabetic" stroke-opacity="1" stroke-linejoin="bevel" stroke-miterlimit="10" stroke-width="3">r</text><text fill="rgb(255,0,0)" stroke="none" font-family="geogebra-sans-serif, sans-serif" font-size="16px" font-style="normal" font-weight="normal" text-decoration="normal" x="380" y="346" text-anchor="start" dominant-baseline="alphabetic" fill-opacity="1">r</text><text fill="rgb(255,0,0)" stroke="none" font-family="geogebra-sans-serif, sans-serif" font-size="14px" font-style="normal" font-weight="normal" text-decoration="normal" x="385" y="353" text-anchor="start" dominant-baseline="alphabetic" fill-opacity="1">2</text><text fill="none" stroke="rgb(255,255,255)" font-family="geogebra-sans-serif, sans-serif" font-size="14px" font-style="normal" font-weight="normal" text-decoration="normal" x="385" y="353" text-anchor="start" dominant-baseline="alphabetic" stroke-opacity="1" stroke-linejoin="bevel" stroke-miterlimit="10" stroke-width="3">2</text><text fill="rgb(255,0,0)" stroke="none" font-family="geogebra-sans-serif, sans-serif" font-size="14px" font-style="normal" font-weight="normal" text-decoration="normal" x="385" y="353" text-anchor="start" dominant-baseline="alphabetic" fill-opacity="1">2</text><path fill="none" stroke="rgb(0,0,0)" paint-order="fill stroke markers" d=" M 553.6230671998042 264.4137930419122 L 233.70280447113885 81.07487324740777" stroke-opacity="0.6980392156862745" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="2.5"></path><path fill="rgb(0,0,0)" stroke="none" paint-order="stroke fill markers" fill-rule="evenodd" d=" M 218.95315555762556 72.6221898315867 L 235.81597532509412 77.38746101902944 L 231.58963361718358 84.76228547578609 Z" fill-opacity="0.6980392156862745"></path><text fill="rgb(0,0,0)" stroke="none" font-family="geogebra-sans-serif, sans-serif" font-size="16px" font-style="normal" font-weight="normal" text-decoration="normal" x="384" y="172" text-anchor="start" dominant-baseline="alphabetic" fill-opacity="1">r</text><text fill="none" stroke="rgb(255,255,255)" font-family="geogebra-sans-serif, sans-serif" font-size="16px" font-style="normal" font-weight="normal" text-decoration="normal" x="384" y="172" text-anchor="start" dominant-baseline="alphabetic" stroke-opacity="1" stroke-linejoin="bevel" stroke-miterlimit="10" stroke-width="3">r</text><text fill="rgb(0,0,0)" stroke="none" font-family="geogebra-sans-serif, sans-serif" font-size="16px" font-style="normal" font-weight="normal" text-decoration="normal" x="384" y="172" text-anchor="start" dominant-baseline="alphabetic" fill-opacity="1">r</text><path fill="none" stroke="rgb(255,0,0)" paint-order="fill stroke markers" d=" M 71.76923824130938 511.91946756073787 L 536.6230671998042 511.91946756073787" stroke-opacity="0.6980392156862745" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="2.5"></path><path fill="rgb(255,0,0)" stroke="none" paint-order="stroke fill markers" fill-rule="evenodd" d=" M 553.6230671998042 511.91946756073787 L 536.6230671998042 516.1694675607379 L 536.6230671998042 507.66946756073787 Z" fill-opacity="0.6980392156862745"></path><text fill="rgb(255,0,0)" stroke="none" font-family="geogebra-sans-serif, sans-serif" font-size="16px" font-style="normal" font-weight="normal" text-decoration="normal" x="391" y="521" text-anchor="start" dominant-baseline="alphabetic" fill-opacity="1">x</text><text fill="none" stroke="rgb(255,255,255)" font-family="geogebra-sans-serif, sans-serif" font-size="16px" font-style="normal" font-weight="normal" text-decoration="normal" x="391" y="521" text-anchor="start" dominant-baseline="alphabetic" stroke-opacity="1" stroke-linejoin="bevel" stroke-miterlimit="10" stroke-width="3">x</text><text fill="rgb(255,0,0)" stroke="none" font-family="geogebra-sans-serif, sans-serif" font-size="16px" font-style="normal" font-weight="normal" text-decoration="normal" x="391" y="521" text-anchor="start" dominant-baseline="alphabetic" fill-opacity="1">x</text><text fill="rgb(255,0,0)" stroke="none" font-family="geogebra-sans-serif, sans-serif" font-size="14px" font-style="normal" font-weight="normal" text-decoration="normal" x="399" y="528" text-anchor="start" dominant-baseline="alphabetic" fill-opacity="1">2</text><text fill="none" stroke="rgb(255,255,255)" font-family="geogebra-sans-serif, sans-serif" font-size="14px" font-style="normal" font-weight="normal" text-decoration="normal" x="399" y="528" text-anchor="start" dominant-baseline="alphabetic" stroke-opacity="1" stroke-linejoin="bevel" stroke-miterlimit="10" stroke-width="3">2</text><text fill="rgb(255,0,0)" stroke="none" font-family="geogebra-sans-serif, sans-serif" font-size="14px" font-style="normal" font-weight="normal" text-decoration="normal" x="399" y="528" text-anchor="start" dominant-baseline="alphabetic" fill-opacity="1">2</text><path fill="none" stroke="rgb(0,0,255)" paint-order="fill stroke markers" d=" M 71.76923824130938 511.91946756073787 L 201.95315555762562 511.91946756073787" stroke-opacity="0.6980392156862745" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="2.5"></path><path fill="rgb(0,0,255)" stroke="none" paint-order="stroke fill markers" fill-rule="evenodd" d=" M 218.95315555762562 511.91946756073787 L 201.95315555762562 516.1694675607379 L 201.95315555762562 507.66946756073787 Z" fill-opacity="0.6980392156862745"></path><text fill="rgb(0,0,255)" stroke="none" font-family="geogebra-sans-serif, sans-serif" font-size="16px" font-style="normal" font-weight="normal" text-decoration="normal" x="148" y="520" text-anchor="start" dominant-baseline="alphabetic" fill-opacity="1">x</text><text fill="none" stroke="rgb(255,255,255)" font-family="geogebra-sans-serif, sans-serif" font-size="16px" font-style="normal" font-weight="normal" text-decoration="normal" x="148" y="520" text-anchor="start" dominant-baseline="alphabetic" stroke-opacity="1" stroke-linejoin="bevel" stroke-miterlimit="10" stroke-width="3">x</text><text fill="rgb(0,0,255)" stroke="none" font-family="geogebra-sans-serif, sans-serif" font-size="16px" font-style="normal" font-weight="normal" text-decoration="normal" x="148" y="520" text-anchor="start" dominant-baseline="alphabetic" fill-opacity="1">x</text><text fill="rgb(0,0,255)" stroke="none" font-family="geogebra-sans-serif, sans-serif" font-size="14px" font-style="normal" font-weight="normal" text-decoration="normal" x="156" y="527" text-anchor="start" dominant-baseline="alphabetic" fill-opacity="1">1</text><text fill="none" stroke="rgb(255,255,255)" font-family="geogebra-sans-serif, sans-serif" font-size="14px" font-style="normal" font-weight="normal" text-decoration="normal" x="156" y="527" text-anchor="start" dominant-baseline="alphabetic" stroke-opacity="1" stroke-linejoin="bevel" stroke-miterlimit="10" stroke-width="3">1</text><text fill="rgb(0,0,255)" stroke="none" font-family="geogebra-sans-serif, sans-serif" font-size="14px" font-style="normal" font-weight="normal" text-decoration="normal" x="156" y="527" text-anchor="start" dominant-baseline="alphabetic" fill-opacity="1">1</text><path fill="none" stroke="rgb(0,0,255)" paint-order="fill stroke markers" d=" M 71.76923824130938 511.91946756073787 L 71.76923824130938 89.6221898315867" stroke-opacity="0.6980392156862745" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="2.5"></path><path fill="rgb(0,0,255)" stroke="none" paint-order="stroke fill markers" fill-rule="evenodd" d=" M 71.76923824130938 72.6221898315867 L 76.01923824130938 89.6221898315867 L 67.51923824130938 89.6221898315867 Z" fill-opacity="0.6980392156862745"></path><text fill="rgb(0,0,255)" stroke="none" font-family="geogebra-sans-serif, sans-serif" font-size="16px" font-style="normal" font-weight="normal" text-decoration="normal" x="53" y="213" text-anchor="start" dominant-baseline="alphabetic" fill-opacity="1">y</text><text fill="none" stroke="rgb(255,255,255)" font-family="geogebra-sans-serif, sans-serif" font-size="16px" font-style="normal" font-weight="normal" text-decoration="normal" x="53" y="213" text-anchor="start" dominant-baseline="alphabetic" stroke-opacity="1" stroke-linejoin="bevel" stroke-miterlimit="10" stroke-width="3">y</text><text fill="rgb(0,0,255)" stroke="none" font-family="geogebra-sans-serif, sans-serif" font-size="16px" font-style="normal" font-weight="normal" text-decoration="normal" x="53" y="213" text-anchor="start" dominant-baseline="alphabetic" fill-opacity="1">y</text><text fill="rgb(0,0,255)" stroke="none" font-family="geogebra-sans-serif, sans-serif" font-size="14px" font-style="normal" font-weight="normal" text-decoration="normal" x="61" y="220" text-anchor="start" dominant-baseline="alphabetic" fill-opacity="1">1</text><text fill="none" stroke="rgb(255,255,255)" font-family="geogebra-sans-serif, sans-serif" font-size="14px" font-style="normal" font-weight="normal" text-decoration="normal" x="61" y="220" text-anchor="start" dominant-baseline="alphabetic" stroke-opacity="1" stroke-linejoin="bevel" stroke-miterlimit="10" stroke-width="3">1</text><text fill="rgb(0,0,255)" stroke="none" font-family="geogebra-sans-serif, sans-serif" font-size="14px" font-style="normal" font-weight="normal" text-decoration="normal" x="61" y="220" text-anchor="start" dominant-baseline="alphabetic" fill-opacity="1">1</text><path fill="none" stroke="rgb(255,0,0)" paint-order="fill stroke markers" d=" M 71.76923824130938 511.91946756073787 L 71.76923824130938 276.94128775100717" stroke-opacity="0.6980392156862745" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="2.5"></path><path fill="rgb(255,0,0)" stroke="none" paint-order="stroke fill markers" fill-rule="evenodd" d=" M 71.76923824130938 259.94128775100717 L 76.01923824130938 276.94128775100717 L 67.51923824130938 276.94128775100717 Z" fill-opacity="0.6980392156862745"></path><text fill="rgb(255,0,0)" stroke="none" font-family="geogebra-sans-serif, sans-serif" font-size="16px" font-style="normal" font-weight="normal" text-decoration="normal" x="53" y="334" text-anchor="start" dominant-baseline="alphabetic" fill-opacity="1">y</text><text fill="none" stroke="rgb(255,255,255)" font-family="geogebra-sans-serif, sans-serif" font-size="16px" font-style="normal" font-weight="normal" text-decoration="normal" x="53" y="334" text-anchor="start" dominant-baseline="alphabetic" stroke-opacity="1" stroke-linejoin="bevel" stroke-miterlimit="10" stroke-width="3">y</text><text fill="rgb(255,0,0)" stroke="none" font-family="geogebra-sans-serif, sans-serif" font-size="16px" font-style="normal" font-weight="normal" text-decoration="normal" x="53" y="334" text-anchor="start" dominant-baseline="alphabetic" fill-opacity="1">y</text><text fill="rgb(255,0,0)" stroke="none" font-family="geogebra-sans-serif, sans-serif" font-size="14px" font-style="normal" font-weight="normal" text-decoration="normal" x="61" y="341" text-anchor="start" dominant-baseline="alphabetic" fill-opacity="1">2</text><text fill="none" stroke="rgb(255,255,255)" font-family="geogebra-sans-serif, sans-serif" font-size="14px" font-style="normal" font-weight="normal" text-decoration="normal" x="61" y="341" text-anchor="start" dominant-baseline="alphabetic" stroke-opacity="1" stroke-linejoin="bevel" stroke-miterlimit="10" stroke-width="3">2</text><text fill="rgb(255,0,0)" stroke="none" font-family="geogebra-sans-serif, sans-serif" font-size="14px" font-style="normal" font-weight="normal" text-decoration="normal" x="61" y="341" text-anchor="start" dominant-baseline="alphabetic" fill-opacity="1">2</text><path fill="rgb(77,77,255)" stroke="none" paint-order="stroke fill markers" d=" M 227.9531555576256 72.6221898315867 C 227.9531555576256 77.59275258006383 223.92371830610273 81.6221898315867 218.9531555576256 81.6221898315867 C 213.98259280914846 81.6221898315867 209.9531555576256 77.59275258006383 209.9531555576256 72.6221898315867 C 209.9531555576256 67.65162708310956 213.98259280914846 63.622189831586695 218.9531555576256 63.622189831586695 C 223.92371830610273 63.622189831586695 227.9531555576256 67.65162708310956 227.9531555576256 72.6221898315867 Z" fill-opacity="1"></path><path fill="none" stroke="rgb(0,0,0)" paint-order="fill stroke markers" d=" M 227.9531555576256 72.6221898315867 C 227.9531555576256 77.59275258006383 223.92371830610273 81.6221898315867 218.9531555576256 81.6221898315867 C 213.98259280914846 81.6221898315867 209.9531555576256 77.59275258006383 209.9531555576256 72.6221898315867 C 209.9531555576256 67.65162708310956 213.98259280914846 63.622189831586695 218.9531555576256 63.622189831586695 C 223.92371830610273 63.622189831586695 227.9531555576256 67.65162708310956 227.9531555576256 72.6221898315867 Z" stroke-opacity="1" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10"></path><text fill="rgb(77,77,255)" stroke="none" font-family="geogebra-sans-serif, sans-serif" font-size="16px" font-style="normal" font-weight="normal" text-decoration="normal" x="223" y="55" text-anchor="start" dominant-baseline="alphabetic" fill-opacity="1">m</text><text fill="none" stroke="rgb(255,255,255)" font-family="geogebra-sans-serif, sans-serif" font-size="16px" font-style="normal" font-weight="normal" text-decoration="normal" x="223" y="55" text-anchor="start" dominant-baseline="alphabetic" stroke-opacity="1" stroke-linejoin="bevel" stroke-miterlimit="10" stroke-width="3">m</text><text fill="rgb(77,77,255)" stroke="none" font-family="geogebra-sans-serif, sans-serif" font-size="16px" font-style="normal" font-weight="normal" text-decoration="normal" x="223" y="55" text-anchor="start" dominant-baseline="alphabetic" fill-opacity="1">m</text><text fill="rgb(77,77,255)" stroke="none" font-family="geogebra-sans-serif, sans-serif" font-size="14px" font-style="normal" font-weight="normal" text-decoration="normal" x="236" y="62" text-anchor="start" dominant-baseline="alphabetic" fill-opacity="1">1</text><text fill="none" stroke="rgb(255,255,255)" font-family="geogebra-sans-serif, sans-serif" font-size="14px" font-style="normal" font-weight="normal" text-decoration="normal" x="236" y="62" text-anchor="start" dominant-baseline="alphabetic" stroke-opacity="1" stroke-linejoin="bevel" stroke-miterlimit="10" stroke-width="3">1</text><text fill="rgb(77,77,255)" stroke="none" font-family="geogebra-sans-serif, sans-serif" font-size="14px" font-style="normal" font-weight="normal" text-decoration="normal" x="236" y="62" text-anchor="start" dominant-baseline="alphabetic" fill-opacity="1">1</text><path fill="rgb(255,0,0)" stroke="none" paint-order="stroke fill markers" d=" M 562.6230671998042 264.4137930419122 C 562.6230671998042 269.38435579038935 558.5936299482813 273.4137930419122 553.6230671998042 273.4137930419122 C 548.652504451327 273.4137930419122 544.6230671998042 269.38435579038935 544.6230671998042 264.4137930419122 C 544.6230671998042 259.443230293435 548.652504451327 255.4137930419122 553.6230671998042 255.4137930419122 C 558.5936299482813 255.4137930419122 562.6230671998042 259.443230293435 562.6230671998042 264.4137930419122 Z" fill-opacity="1"></path><path fill="none" stroke="rgb(0,0,0)" paint-order="fill stroke markers" d=" M 562.6230671998042 264.4137930419122 C 562.6230671998042 269.38435579038935 558.5936299482813 273.4137930419122 553.6230671998042 273.4137930419122 C 548.652504451327 273.4137930419122 544.6230671998042 269.38435579038935 544.6230671998042 264.4137930419122 C 544.6230671998042 259.443230293435 548.652504451327 255.4137930419122 553.6230671998042 255.4137930419122 C 558.5936299482813 255.4137930419122 562.6230671998042 259.443230293435 562.6230671998042 264.4137930419122 Z" stroke-opacity="1" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10"></path><text fill="rgb(255,0,0)" stroke="none" font-family="geogebra-sans-serif, sans-serif" font-size="16px" font-style="normal" font-weight="normal" text-decoration="normal" x="558" y="246" text-anchor="start" dominant-baseline="alphabetic" fill-opacity="1">m</text><text fill="none" stroke="rgb(255,255,255)" font-family="geogebra-sans-serif, sans-serif" font-size="16px" font-style="normal" font-weight="normal" text-decoration="normal" x="558" y="246" text-anchor="start" dominant-baseline="alphabetic" stroke-opacity="1" stroke-linejoin="bevel" stroke-miterlimit="10" stroke-width="3">m</text><text fill="rgb(255,0,0)" stroke="none" font-family="geogebra-sans-serif, sans-serif" font-size="16px" font-style="normal" font-weight="normal" text-decoration="normal" x="558" y="246" text-anchor="start" dominant-baseline="alphabetic" fill-opacity="1">m</text><text fill="rgb(255,0,0)" stroke="none" font-family="geogebra-sans-serif, sans-serif" font-size="14px" font-style="normal" font-weight="normal" text-decoration="normal" x="571" y="253" text-anchor="start" dominant-baseline="alphabetic" fill-opacity="1">2</text><text fill="none" stroke="rgb(255,255,255)" font-family="geogebra-sans-serif, sans-serif" font-size="14px" font-style="normal" font-weight="normal" text-decoration="normal" x="571" y="253" text-anchor="start" dominant-baseline="alphabetic" stroke-opacity="1" stroke-linejoin="bevel" stroke-miterlimit="10" stroke-width="3">2</text><text fill="rgb(255,0,0)" stroke="none" font-family="geogebra-sans-serif, sans-serif" font-size="14px" font-style="normal" font-weight="normal" text-decoration="normal" x="571" y="253" text-anchor="start" dominant-baseline="alphabetic" fill-opacity="1">2</text></g></g></svg>
+            </center>
+            <p>
+                As equações do movimento serão:
+                \[m_1\vec a_1 = -G\frac{m_1 m_2}{r^2}\hat r,\]
+                \[m_2\vec a_2 = G\frac{m_1 m_2}{r^2}\hat r.\]
+            </p>
+            <p>
+                Nestas equações temos que prestar atenção no sentido do vetor \(\mathbf r\) que sai de \(m_2\) e encontra 
+                \(m_1\), o r com chapéu (\(\hat r\)) indica essa direção e sentido para a força, como \(m_1\) sofre uma 
+                atração de \(m_2\), o sinal negativo deve ser usado pra representar o vetor força agindo em \(m_1\), dado 
+                que essa força está em sentido contrário ao vetor \(\mathbf r\). Já a força que atua no corpo \(m_2\) 
+                é exatamente no sentido do vetor \(\mathbf r\), e o módulo delas é idêntico por se tratar de um par de ação 
+                e reação.
+            </p>
+            <p>
+                Agora escrevemos os elementos dessas equações usando as coordenadas cartesianas, primeiro o módulo do 
+                vetor \(\mathbf r\),
+                \[ r = \sqrt{\left(x_1-x_2\right)^2 + \left(y_1-y_2\right)^2}, \]
+                uma vez que o vetor \(\mathbf r\) é dado em coordenadas cartesianas por 
+                \[ \mathbf r = \left(x_1-x_2\right)\hat i + \left(y_1-y_2\right)\hat j, \]
+                com \(\hat i\) e \(\hat j\) indicando a direção e sentido positivo dos eixos \(x\) e \(y\) respectivamente.
+            </p>
+            <p>
+                O versor que indica a direção do vetor \(\mathbf r\) pode ser escrito por:
+                \[ \hat r = \frac{\mathbf r}{r}. \]
+            </p>
+            <p>
+                Com esses elementos vamos separar as duas equações vetoriais acima em quatro equações nas coordenadas \(x\) 
+                e \(y\) de cada aceleração:
+                \[ a_{1,x} = -G\frac{m_2}{r^3}(x_1-x_2); \]
+                \[ a_{1,y} = -G\frac{m_2}{r^3}(y_1-y_2); \]
+                \[ a_{2,x} = G\frac{m_1}{r^3}(x_1-x_2); \]
+                \[ a_{2,y} = G\frac{m_1}{r^3}(y_1-y_2). \]
+            </p>
+            <p>
+                Já vimos anteriormente que a equação da aceleração gera a equação de diferenças finitas da velocidade, 
+                e a equação e a equação da velocidade gera a diferença finita da posição, por simplicidade o fator comum 
+                das equações acima usaremos uma notação mais compacta definindo
+                \[ f_x = G\frac{\left(x_1-x_2\right)}{r^3}, \]
+                \[ f_y = G\frac{\left(y_1-y_2\right)}{r^3}, \]
+                com 
+                \[ r^3 = \left(\sqrt{\left(x_1-x_2\right)^2 + \left(y_1-y_2\right)^2}\right)^3. \]
+            </p>
+            <p>
+                O conjunto de equações de diferenças finitas fica portanto, para velocidades
+                \[ v_{x,1|i+1} = v_{x,1|i} -m_2f_x\cdot\Delta t \]
+                \[ v_{x,2|i+1} = v_{x,2|i} +m_1f_x\cdot\Delta t \]
+                \[ v_{y,1|i+1} = v_{y,1|i} -m_2f_y\cdot\Delta t \]
+                \[ v_{y,2|i+1} = v_{y,2|i} +m_1f_y\cdot\Delta t \]
+                e posições
+                \[ x_{1,i+1} = x_{1,i} + v_{x,1|i}\cdot \Delta t \]
+                \[ x_{2,i+1} = x_{2,i} + v_{x,2|i}\cdot \Delta t \]
+                \[ y_{1,i+1} = y_{1,i} + v_{y,1|i}\cdot \Delta t \]
+                \[ y_{2,i+1} = y_{2,i} + v_{y,2|i}\cdot \Delta t. \]
+            </p>
+            <p>
+                Supondo que fóssemos simular o movimento ao longo do eixo \(z\) pra descrever o movimentos de forma 
+                tridimensional precisaríamos ter mais uma equação para as posições e velocidades nesse eixo, para cada 
+                corpo em movimento, seriam portanto mais quatro equações, totalizando 12 equações para descrever o movimento 
+                tridimensional de dois corpos em interação, tente responder para o caso de três corpos interagindo em três 
+                dimensões.
+            </p>
+            <h2>
+                Simulando
+            </h2>
+            <p>
+                Vamos usar o canvas para observar a órbita desenvolvida por dois corpos com interação gravitacional, o Sol 
+                e a Terra por exemplo, primeiro vamos ajustar o <code>canvas</code> para ter as dimensões na escala dos 
+                eixos com a representração dessa órbita, uma rápida pesquisa é possível descobrir a distância média da Terra 
+                ao Sol (\(1,476\times 10^8km\)) e a velocidade média (\(29.800m/s\)) desde planeta em torno da nossa estrela, isso
+                é o suficiente para sabermos qual escala devemos usar no <code>canvas</code>.
+            </p>
+            <p>
+                Podemos portanto escolher o intervalo nos eixos do canvas como indo de \(\left[-2,2\right]\) nos dois eixos, 
+                dada posição ali representada deve ser multiplicada por \(10^{11}\), uma vez que a posição \(1,476\) neste 
+                gráfico irá representar a posição inicial da Terra, com o Sol no ponto \((0,0)\) do gráfico. Nessa escala 
+                a velocidade inicial que usaremos terá que ser  \(2,98\times 10^{-7}\) uma vez que cada unidade neste gráfico 
+                equivale ao deslocamento de \(10^{11}m=10^8km\) na escala real. Usando esses valores qualquer valor que 
+                escolhermos para \(\Delta t\) estará representado em segundos.
+            </p>
+            <p>
+                Para facilitar a simulação escolhemos a constante gravitacional \(G = 1\), dessa forma não precisamos 
+                incluí-la nos cálculos, caso necessitemos escrever as posições com as coordenadas reais cuidamos para 
+                que essa constante seja reinserida por meio de uma simples multiplicação ao resultado. Aplicaremos essa 
+                mesma técnica para as velocidades e posições iniciais.
+            </p>
+            <p>
+                Dessa forma podemos definir as condições iniciais da seguinte forma:
+            </p>
+         <pre class="prettyprint">            <code>
+const m1 = 1; // Massa do Sol
+const m2 = 0.000003002513826043238; // massa da Terra dividida pela massa do Sol
+            </code>
+            </pre>
+            
+            </main>
+        
+        <footer>
+            <h1>
+                Resultados
+            </h1>
+            <p>
+                Desenhando as restas dos eixos
+            </p>
+            <center>
+                <canvas id="canvas1" width="720" height="440" style="border: 1px solid black"></canvas>
+            </center>
+            <p>
+                Exibindo as escalas no eixo \(x\)
+            </p>
+            <center>
+                <canvas id="canvas2" width="720" height="440" style="border: 1px solid black"></canvas>
+            </center>
+            <p>
+                Exibindo as escalas nos eixos \(x\) e \(y\)
+            </p>
+            <center>
+                <canvas id="canvas3" width="720" height="440" style="border: 1px solid black"></canvas>
+            </center>
+            <p>
+                Gravitação
+            </p>
+            <center>
+                <canvas id="canvas4" width="720" height="440" style="border: 1px solid black"></canvas>
+            </center>
+            <p>
+                Animando a gravitação
+            </p>
+            <center>
+            <svg id="external-1" xmlns="http://www.w3.org/2000/svg" height="720" width="720"> 
+                <circle class="draggable" id="sol" cx="220" cy="360" r="20" stroke="black" stroke-width="3" fill="yellow"></circle>
+                <circle class="draggable" id="terra" cx="220" cy="200" r="10" stroke="black" stroke-width="3" fill="blue"></circle>
+            </svg> 
+            </center>
+        </footer>
+
+    
+</body></html>
